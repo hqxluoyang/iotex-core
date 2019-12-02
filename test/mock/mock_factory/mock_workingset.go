@@ -10,7 +10,6 @@ import (
 	hash "github.com/iotexproject/go-pkgs/hash"
 	action "github.com/iotexproject/iotex-core/action"
 	db "github.com/iotexproject/iotex-core/db"
-	batch "github.com/iotexproject/iotex-core/db/batch"
 	reflect "reflect"
 )
 
@@ -182,20 +181,6 @@ func (mr *MockWorkingSetMockRecorder) Height() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Height", reflect.TypeOf((*MockWorkingSet)(nil).Height))
 }
 
-// History mocks base method
-func (m *MockWorkingSet) History() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "History")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// History indicates an expected call of History
-func (mr *MockWorkingSetMockRecorder) History() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "History", reflect.TypeOf((*MockWorkingSet)(nil).History))
-}
-
 // State mocks base method
 func (m *MockWorkingSet) State(arg0 hash.Hash160, arg1 interface{}) error {
 	m.ctrl.T.Helper()
@@ -250,18 +235,4 @@ func (m *MockWorkingSet) GetDB() db.KVStore {
 func (mr *MockWorkingSetMockRecorder) GetDB() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDB", reflect.TypeOf((*MockWorkingSet)(nil).GetDB))
-}
-
-// GetCachedBatch mocks base method
-func (m *MockWorkingSet) GetCachedBatch() batch.CachedBatch {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCachedBatch")
-	ret0, _ := ret[0].(batch.CachedBatch)
-	return ret0
-}
-
-// GetCachedBatch indicates an expected call of GetCachedBatch
-func (mr *MockWorkingSetMockRecorder) GetCachedBatch() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCachedBatch", reflect.TypeOf((*MockWorkingSet)(nil).GetCachedBatch))
 }

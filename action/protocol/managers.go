@@ -3,7 +3,6 @@ package protocol
 import (
 	"github.com/iotexproject/go-pkgs/hash"
 	"github.com/iotexproject/iotex-core/db"
-	"github.com/iotexproject/iotex-core/db/batch"
 )
 
 // StateReader defines an interface to read state db
@@ -22,5 +21,4 @@ type StateManager interface {
 	PutState(hash.Hash160, interface{}) error
 	DelState(pkHash hash.Hash160) error
 	GetDB() db.KVStore
-	GetCachedBatch() batch.CachedBatch
 }

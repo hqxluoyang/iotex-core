@@ -888,7 +888,8 @@ func TestLoadBlockchainfromDB(t *testing.T) {
 		blk, err := bc.BlockDAO().GetBlockByHeight(3)
 		require.NotNil(blk)
 		require.NoError(err)
-		require.NoError(bc.(*blockchain).commitBlock(blk))
+		err = bc.(*blockchain).commitBlock(blk)
+		require.NoError(err)
 		fmt.Printf("Cannot add block 3 again: %v\n", err)
 
 		// invalid address returns error

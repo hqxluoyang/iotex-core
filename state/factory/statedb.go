@@ -34,7 +34,6 @@ import (
 type stateDB struct {
 	mutex              sync.RWMutex
 	currentChainHeight uint64
-	saveHistory        bool
 	cfg                config.Config
 	dao                db.KVStore // the underlying DB for account/contract storage
 	timerFactory       *prometheustimer.TimerFactory
@@ -63,7 +62,7 @@ func DefaultStateDBOption() StateDBOption {
 		}
 		cfg.DB.DbPath = dbPath // TODO: remove this after moving TrieDBPath from cfg.Chain to cfg.DB
 		sdb.dao = db.NewBoltDB(cfg.DB)
-		sdb.saveHistory = cfg.Chain.EnableHistoryStateDB
+
 		return nil
 	}
 }
@@ -108,7 +107,7 @@ func (sdb *stateDB) Start(ctx context.Context) error {
 		return err
 	}
 	// check factory height
-	h, err := sdb.dao.Get(AccountKVNameSpace, []byte(CurrentHeightKey))
+	h, err := sdb.dao.Get(AccountKVNamespace, []byte(CurrentHeightKey))
 	switch errors.Cause(err) {
 	case nil:
 		sdb.currentChainHeight = byteutil.BytesToUint64(h)
@@ -118,7 +117,7 @@ func (sdb *stateDB) Start(ctx context.Context) error {
 		if err = sdb.createGenesisStates(ctx); err != nil {
 			return errors.Wrap(err, "failed to create genesis states")
 		}
-		if err = sdb.dao.Put(AccountKVNameSpace, []byte(CurrentHeightKey), byteutil.Uint64ToBytes(0)); err != nil {
+		if err = sdb.dao.Put(AccountKVNamespace, []byte(CurrentHeightKey), byteutil.Uint64ToBytes(0)); err != nil {
 			return errors.Wrap(err, "failed to init statedb's height")
 		}
 	default:
@@ -183,7 +182,7 @@ func (sdb *stateDB) RootHashByHeight(blockHeight uint64) (hash.Hash256, error) {
 func (sdb *stateDB) Height() (uint64, error) {
 	sdb.mutex.RLock()
 	defer sdb.mutex.RUnlock()
-	height, err := sdb.dao.Get(AccountKVNameSpace, []byte(CurrentHeightKey))
+	height, err := sdb.dao.Get(AccountKVNamespace, []byte(CurrentHeightKey))
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get factory's height from underlying DB")
 	}
@@ -194,13 +193,16 @@ func (sdb *stateDB) NewWorkingSet() (WorkingSet, error) {
 	sdb.mutex.RLock()
 	defer sdb.mutex.RUnlock()
 
-	return newStateTX(sdb.currentChainHeight+1, sdb.dao, sdb.saveHistory), nil
+	return newStateTX(sdb.currentChainHeight+1, sdb.dao)
 }
 
 func (sdb *stateDB) RunActions(ctx context.Context, actions []action.SealedEnvelope) ([]*action.Receipt, WorkingSet, error) {
 	sdb.mutex.Lock()
-	ws := newStateTX(sdb.currentChainHeight+1, sdb.dao, sdb.saveHistory)
+	ws, err := newStateTX(sdb.currentChainHeight+1, sdb.dao)
 	sdb.mutex.Unlock()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return runActions(ctx, ws, actions)
 }
@@ -211,8 +213,11 @@ func (sdb *stateDB) PickAndRunActions(
 	postSystemActions []action.SealedEnvelope,
 ) ([]*action.Receipt, []action.SealedEnvelope, WorkingSet, error) {
 	sdb.mutex.Lock()
-	ws := newStateTX(sdb.currentChainHeight+1, sdb.dao, sdb.saveHistory)
+	ws, err := newStateTX(sdb.currentChainHeight+1, sdb.dao)
 	sdb.mutex.Unlock()
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	return pickAndRunActions(ctx, ws, actionMap, postSystemActions, sdb.cfg.Chain.AllowedBlockGasResidue)
 }
@@ -226,8 +231,11 @@ func (sdb *stateDB) SimulateExecution(
 	getBlockHash evm.GetBlockHash,
 ) ([]byte, *action.Receipt, error) {
 	sdb.mutex.Lock()
-	ws := newStateTX(sdb.currentChainHeight+1, sdb.dao, sdb.saveHistory)
+	ws, err := newStateTX(sdb.currentChainHeight+1, sdb.dao)
 	sdb.mutex.Unlock()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return simulateExecution(ctx, ws, caller, ex, getBlockHash)
 }
@@ -296,7 +304,7 @@ func (sdb *stateDB) State(addr hash.Hash160, state interface{}) error {
 //======================================
 
 func (sdb *stateDB) state(addr hash.Hash160, s interface{}) error {
-	data, err := sdb.dao.Get(AccountKVNameSpace, addr[:])
+	data, err := sdb.dao.Get(AccountKVNamespace, addr[:])
 	if err != nil {
 		if errors.Cause(err) == db.ErrNotExist {
 			return errors.Wrapf(state.ErrStateNotExist, "state of %x doesn't exist", addr)
@@ -343,7 +351,10 @@ func (sdb *stateDB) commit(ws WorkingSet) error {
 
 // Initialize initializes the state db
 func (sdb *stateDB) createGenesisStates(ctx context.Context) error {
-	ws := newStateTX(0, sdb.dao, sdb.saveHistory)
+	ws, err := newStateTX(0, sdb.dao)
+	if err != nil {
+		return err
+	}
 	if err := createGenesisStates(ctx, ws); err != nil {
 		return err
 	}
